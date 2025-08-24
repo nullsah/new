@@ -2619,18 +2619,18 @@ G2L_MODULES[G2L["5"]] = {
 				return (typeof(i) == "CFrame" and i.Position) or (typeof(i) == "Instance" and i:IsA("Mouse") and i.Hit.Position) or (typeof(i) == "Instance" and i:IsA("BasePart") or i:IsA("Camera") and i.CFrame.Position) or (typeof(i) == "Vector3" and i)
 			end,
 			["SimulateInput"] = {
-				["Down"] = function(input: Enum.KeyCode, holdTime: number)
+				["Down"] = function(input: Enum., holdTime: number)
 					GameService.VirtualInputManager:SendKeyEvent(true, input, false, nil)
 				end,
-				["Up"] = function(input: Enum.KeyCode, holdTime: number)
+				["Up"] = function(input: Enum., holdTime: number)
 					GameService.VirtualInputManager:SendKeyEvent(false, input, false, nil)
 				end,
-				["Hold"] = function(input: Enum.KeyCode, holdTime: number)
+				["Hold"] = function(input: Enum., holdTime: number)
 					GameService.VirtualInputManager:SendKeyEvent(true, input, false, nil)
 					task.wait(holdTime)
 					GameService.VirtualInputManager:SendKeyEvent(false, input, false, nil)
 				end,
-				["Press"] = function(input: Enum.KeyCode)
+				["Press"] = function(input: Enum.)
 					GameService.VirtualInputManager:SendKeyEvent(true, input, false, nil)
 					task.wait(0.005)
 					GameService.VirtualInputManager:SendKeyEvent(false, input, false, nil)
@@ -2706,11 +2706,6 @@ G2L_MODULES[G2L["7"]] = {
 				["Gui"] = {
 					["Value"] = false,
 					["Key"] = Enum.KeyCode.L,
-				},
-				["End"] = {
-					["Value"] = false, 
-					["EndSignal"] = Instance.new("BindableEvent"), 
-					["Key"] = Enum.KeyCode.End
 				},
 			},
 			["Debounces"] = {
