@@ -6,52 +6,50 @@ local UIS: UserInputService = cloneref(game:GetService("UserInputService"));
 local plr = Players.LocalPlayer;
 local cam = workspace.CurrentCamera;
 
-local teams = loadstring(game:HttpGet("https://raw.githubusercontent.com/sneekygoober/Valley-Prison-Silent-Aim-Script/refs/heads/main/Teams.luau"))();
+-- Team definitions
+local prisonerTeams = {
+    ["minimum security"] = true,
+    ["medium security"]  = true,
+    ["maximum security"] = true,
+    ["escapee"]          = true,
+    ["booking"]          = true,
+}
+local ignoredTeams = { ["menu"] = true }
 
--- Fixed isSameTeam function with proper null checks
+-- Fixed isSameTeam function - returns true if SAME team (should NOT target)
 local isSameTeam = function(player: Player): boolean
     -- Basic null checks
     if not player or not player.Team or not plr.Team then 
         return false 
     end
     
-    -- Get team values with safe defaults
-    local playerTeamValue = teams[player.Team.Name]
-    local myTeamValue = teams[plr.Team.Name]
+    local myTeamName = string.lower(plr.Team.Name)
+    local theirTeamName = string.lower(player.Team.Name)
     
-    -- Handle nil team values
-    if playerTeamValue == nil or myTeamValue == nil then
+    -- Check if either team is ignored
+    if ignoredTeams[myTeamName] or ignoredTeams[theirTeamName] then
         return false
     end
     
-    -- Check if player is in team 2 (always target)
-    if playerTeamValue == 2 then 
-        return false 
+    -- Same team = true (should NOT target)
+    if myTeamName == theirTeamName then
+        return true
     end
     
-    -- Special logic for team 0
-    if myTeamValue == 0 and myTeamValue ~= playerTeamValue then
-        -- Check if character and tool exist safely
-        local char = player.Character
-        if char then
-            local hasTool = char:FindFirstChildOfClass("Tool")
-            if hasTool then 
-                return false 
-            end
-        end
-        
-        -- Safe check for ServerVariables and Innocent
-        local serverVars = player:FindFirstChild("ServerVariables")
-        if serverVars then
-            local innocent = serverVars:FindFirstChild("Innocent")
-            if innocent and innocent.Value then
-                return true
-            end
-        end
-        return false
+    -- Check if I'm a prisoner
+    local imPrisoner = prisonerTeams[myTeamName]
+    -- Check if they're a prisoner
+    local theyrePrisoner = prisonerTeams[theirTeamName]
+    
+    -- If both are prisoners OR both are cops, it's same team (should NOT target)
+    if imPrisoner and theyrePrisoner then
+        return true
+    elseif not imPrisoner and not theyrePrisoner then
+        return true
     end
     
-    return myTeamValue == playerTeamValue
+    -- Different teams (prisoner vs cop) = false (should target)
+    return false
 end;
 
 local rp = RaycastParams.new();
@@ -102,7 +100,7 @@ local isVisible = function(part: BasePart): (boolean, Instance?)
     return false, result.Instance
 end;
 
--- Main getTarget function with improved logic
+-- Main getTarget function
 local getTarget = function(): BasePart?
     local bestPart = nil
     local bestDistance = 300 -- FOV radius
@@ -115,10 +113,10 @@ local getTarget = function(): BasePart?
     end
     
     for _, player: Player in next, Players:GetPlayers() do
-        -- Skip self and invalid players
+        -- Skip self
         if player == plr then continue end
         
-        -- Safe team check
+        -- Safe team check - if same team, skip
         local success, sameTeam = pcall(isSameTeam, player)
         if not success or sameTeam then 
             continue 
@@ -130,7 +128,7 @@ local getTarget = function(): BasePart?
             continue 
         end
         
-        -- Check for ForceField safely
+        -- Check for ForceField
         local forceField = char:FindFirstChildWhichIsA("ForceField")
         if forceField then 
             continue 
