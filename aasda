@@ -52,53 +52,48 @@ local isSameTeam = function(player: Player): boolean
     return false
 end;
 
-local rp = RaycastParams.new();
-rp.FilterType = Enum.RaycastFilterType.Exclude;
-rp.IgnoreWater = true;
-
--- Improved isVisible function with better error handling
-local isVisible = function(part: BasePart): (boolean, Instance?)
-    if not part then 
-        return false, nil 
+-- Simple wall check function
+local function canSeePart(part: BasePart): boolean
+    if not part or not part.Parent then
+        return false
     end
     
     local char = plr.Character
-    if not char then 
-        return false, nil 
+    if not char then
+        return false
     end
     
-    -- Safe check for workspace.Map
-    local map = workspace:FindFirstChild("Map")
-    local invisible = map and map:FindFirstChild("Functional") and map.Functional:FindFirstChild("Invisible")
-    
-    local filterInstances = {char}
-    if invisible then
-        table.insert(filterInstances, invisible)
-    end
-    
-    rp.FilterDescendantsInstances = filterInstances
-
     local origin = cam.CFrame.Position
-    local dir = part.Position - origin
+    local direction = (part.Position - origin).Unit
+    local distance = (part.Position - origin).Magnitude
     
-    -- Check if direction vector is valid
-    if dir.Magnitude < 0.1 then
-        return true, nil
+    -- Raycast from camera to the target part
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {char, plr.Character}
+    raycastParams.IgnoreWater = true
+    
+    local result = workspace:Raycast(origin, direction * distance, raycastParams)
+    
+    -- If no hit, we can see the part directly
+    if not result then
+        return true
     end
     
-    local result: RaycastResult = workspace:Raycast(origin, dir, rp)
-    if not result then 
-        return true, nil 
-    end
-
-    -- Check if the hit instance is part of the target's character
+    -- Check if the hit part is part of the target's character
     local targetChar = part:FindFirstAncestorWhichIsA("Model")
     if targetChar and result.Instance:IsDescendantOf(targetChar) then
-        return true, result.Instance
+        return true
     end
-
-    return false, result.Instance
-end;
+    
+    -- Check if the hit part is close enough to the target part (for partial visibility)
+    local hitDistance = (result.Position - part.Position).Magnitude
+    if hitDistance < 2 then
+        return true
+    end
+    
+    return false
+end
 
 -- Main getTarget function
 local getTarget = function(): BasePart?
@@ -140,13 +135,13 @@ local getTarget = function(): BasePart?
             continue 
         end
         
-        -- Get target part (prioritize Head, then PrimaryPart, then HumanoidRootPart)
+        -- Get target part (prioritize Head, then HumanoidRootPart)
         local tPart: BasePart? = char:FindFirstChild("Head")
         if not tPart then
-            tPart = char.PrimaryPart
+            tPart = char:FindFirstChild("HumanoidRootPart")
         end
         if not tPart then
-            tPart = char:FindFirstChild("HumanoidRootPart")
+            tPart = char.PrimaryPart
         end
         if not tPart then 
             continue 
@@ -158,21 +153,19 @@ local getTarget = function(): BasePart?
             continue 
         end
         
-        -- Check visibility with fallback to other parts
-        local visible, hitPart = isVisible(tPart)
-        local finalPart = tPart
+        -- Check visibility with wall check
+        local visible = canSeePart(tPart)
         
+        -- If head isn't visible, try body parts
         if not visible then
-            -- Try with PrimaryPart or HumanoidRootPart as fallback
-            local fallbackPart = char.PrimaryPart or char:FindFirstChild("HumanoidRootPart")
-            if fallbackPart and fallbackPart ~= tPart then
-                visible, hitPart = isVisible(fallbackPart)
+            -- Try HumanoidRootPart
+            local rootPart = char:FindFirstChild("HumanoidRootPart")
+            if rootPart and rootPart ~= tPart then
+                visible = canSeePart(rootPart)
                 if visible then
-                    finalPart = hitPart or fallbackPart
+                    tPart = rootPart
                 end
             end
-        else
-            finalPart = hitPart or tPart
         end
         
         if not visible then 
@@ -184,7 +177,7 @@ local getTarget = function(): BasePart?
         
         -- Update best target
         if distance < bestDistance then
-            bestPart = finalPart
+            bestPart = tPart
             bestDistance = distance
         end
     end
