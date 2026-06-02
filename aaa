@@ -1,24 +1,46 @@
-local cloneref = cloneref or function(i) return i end
-local Players = cloneref(game:GetService("Players"))
+local cloneref = cloneref or function(i: Instance) return i; end;
 
-local Drawlib = loadstring(game:HttpGet("https://raw.githubusercontent.com/sneekygoober/sneeky-s-fov-lib/refs/heads/main/lib.luau"))()
-local info = loadstring(game:HttpGet("https://raw.githubusercontent.com/sneekygoober/sneeky-s-fov-lib/refs/heads/main/info.luau"))()
+local Players = cloneref(game:GetService("Players"));
+local plr = Players.LocalPlayer;
 
-local key = info.ggKey -- simplified
+local code = function(n: string): string
+    if crypt and crypt.base64encode then
+        return crypt.base64encode(n);
+    end;
+    return n;
+end;
 
--- Cleanup previous instance
-if getgenv()[key] and getgenv()[key]["draw_instance"] then
-    getgenv()[key]["draw_instance"]:terminate()
-    getgenv()[key] = nil
-end
+local get_id = loadstring(game:HttpGet("https://raw.githubusercontent.com/sneekygoober/sneeky-s-fov-lib/refs/heads/main/get_id.luau"))();
+local Drawlib = loadstring(game:HttpGet("https://raw.githubusercontent.com/sneekygoober/sneeky-s-fov-lib/refs/heads/main/lib.luau"))();
+local info = loadstring(game:HttpGet("https://raw.githubusercontent.com/sneekygoober/sneeky-s-fov-lib/refs/heads/main/info.luau"))();
+
+local key = code(info.ggKey);
+
+-- Remove incompatible executors check (optional, can keep if you want)
+-- if executor:match("Xeno", 1) or executor:match("Solara", 1) then ... end
 
 return function(sFOV: number, tFunc: (origin: Vector3?) -> (Model | BasePart)?, mCenter: boolean?)
-    local fovSize = getgenv().fov or sFOV
     
-    local draw = Drawlib.new(fovSize, tFunc, mCenter)
-    draw:start()
+    -- Clean up previous instance if exists
+    if getgenv()[key] then
+        if getgenv()[key]["draw_instance"] then
+            getgenv()[key]["draw_instance"]:terminate();
+        end
+        if getgenv()[key]["p_instance"] then
+            getgenv()[key]["p_instance"]:Destroy();
+        end
+        table.clear(getgenv()[key]);
+        getgenv()[key] = nil;
+    end
 
+    -- Create and start FOV silently
+    local draw = Drawlib.new(getgenv().fov or sFOV, tFunc, mCenter);
+    draw:start();
+
+    -- Store reference
     getgenv()[key] = {
-        draw_instance = draw
-    }
-end
+        ["draw_instance"] = draw,
+        ["p_instance"] = nil  -- No GUI
+    };
+
+end;
