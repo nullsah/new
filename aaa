@@ -1,0 +1,24 @@
+local cloneref = cloneref or function(i) return i end
+local Players = cloneref(game:GetService("Players"))
+
+local Drawlib = loadstring(game:HttpGet("https://raw.githubusercontent.com/sneekygoober/sneeky-s-fov-lib/refs/heads/main/lib.luau"))()
+local info = loadstring(game:HttpGet("https://raw.githubusercontent.com/sneekygoober/sneeky-s-fov-lib/refs/heads/main/info.luau"))()
+
+local key = info.ggKey -- simplified
+
+-- Cleanup previous instance
+if getgenv()[key] and getgenv()[key]["draw_instance"] then
+    getgenv()[key]["draw_instance"]:terminate()
+    getgenv()[key] = nil
+end
+
+return function(sFOV: number, tFunc: (origin: Vector3?) -> (Model | BasePart)?, mCenter: boolean?)
+    local fovSize = getgenv().fov or sFOV
+    
+    local draw = Drawlib.new(fovSize, tFunc, mCenter)
+    draw:start()
+
+    getgenv()[key] = {
+        draw_instance = draw
+    }
+end
