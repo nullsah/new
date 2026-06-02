@@ -1,0 +1,197 @@
+local cloneref = cloneref or function(i: Instance) return i; end;
+
+local Players: Players = cloneref(game:GetService("Players"));
+local UIS: UserInputService = cloneref(game:GetService("UserInputService"));
+
+local plr = Players.LocalPlayer;
+local cam = workspace.CurrentCamera;
+
+local teams = loadstring(game:HttpGet("https://raw.githubusercontent.com/sneekygoober/Valley-Prison-Silent-Aim-Script/refs/heads/main/Teams.luau"))();
+
+-- Fixed isSameTeam function with proper null checks
+local isSameTeam = function(player: Player): boolean
+    -- Basic null checks
+    if not player or not player.Team or not plr.Team then 
+        return false 
+    end
+    
+    -- Get team values with safe defaults
+    local playerTeamValue = teams[player.Team.Name]
+    local myTeamValue = teams[plr.Team.Name]
+    
+    -- Handle nil team values
+    if playerTeamValue == nil or myTeamValue == nil then
+        return false
+    end
+    
+    -- Check if player is in team 2 (always target)
+    if playerTeamValue == 2 then 
+        return false 
+    end
+    
+    -- Special logic for team 0
+    if myTeamValue == 0 and myTeamValue ~= playerTeamValue then
+        -- Check if character and tool exist safely
+        local char = player.Character
+        if char then
+            local hasTool = char:FindFirstChildOfClass("Tool")
+            if hasTool then 
+                return false 
+            end
+        end
+        
+        -- Safe check for ServerVariables and Innocent
+        local serverVars = player:FindFirstChild("ServerVariables")
+        if serverVars then
+            local innocent = serverVars:FindFirstChild("Innocent")
+            if innocent and innocent.Value then
+                return true
+            end
+        end
+        return false
+    end
+    
+    return myTeamValue == playerTeamValue
+end;
+
+local rp = RaycastParams.new();
+rp.FilterType = Enum.RaycastFilterType.Exclude;
+rp.IgnoreWater = true;
+
+-- Improved isVisible function with better error handling
+local isVisible = function(part: BasePart): (boolean, Instance?)
+    if not part then 
+        return false, nil 
+    end
+    
+    local char = plr.Character
+    if not char then 
+        return false, nil 
+    end
+    
+    -- Safe check for workspace.Map
+    local map = workspace:FindFirstChild("Map")
+    local invisible = map and map:FindFirstChild("Functional") and map.Functional:FindFirstChild("Invisible")
+    
+    local filterInstances = {char}
+    if invisible then
+        table.insert(filterInstances, invisible)
+    end
+    
+    rp.FilterDescendantsInstances = filterInstances
+
+    local origin = cam.CFrame.Position
+    local dir = part.Position - origin
+    
+    -- Check if direction vector is valid
+    if dir.Magnitude < 0.1 then
+        return true, nil
+    end
+    
+    local result: RaycastResult = workspace:Raycast(origin, dir, rp)
+    if not result then 
+        return true, nil 
+    end
+
+    -- Check if the hit instance is part of the target's character
+    local targetChar = part:FindFirstAncestorWhichIsA("Model")
+    if targetChar and result.Instance:IsDescendantOf(targetChar) then
+        return true, result.Instance
+    end
+
+    return false, result.Instance
+end;
+
+-- Main getTarget function with improved logic
+local getTarget = function(): BasePart?
+    local bestPart = nil
+    local bestDistance = 300 -- FOV radius
+    local mousePos = UIS:GetMouseLocation()
+    
+    -- Safety check for camera
+    if not cam then
+        cam = workspace.CurrentCamera
+        if not cam then return nil end
+    end
+    
+    for _, player: Player in next, Players:GetPlayers() do
+        -- Skip self and invalid players
+        if player == plr then continue end
+        
+        -- Safe team check
+        local success, sameTeam = pcall(isSameTeam, player)
+        if not success or sameTeam then 
+            continue 
+        end
+        
+        -- Get character safely
+        local char = player.Character
+        if not char then 
+            continue 
+        end
+        
+        -- Check for ForceField safely
+        local forceField = char:FindFirstChildWhichIsA("ForceField")
+        if forceField then 
+            continue 
+        end
+        
+        -- Check humanoid health
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then 
+            continue 
+        end
+        
+        -- Get target part (prioritize Head, then PrimaryPart, then HumanoidRootPart)
+        local tPart: BasePart? = char:FindFirstChild("Head")
+        if not tPart then
+            tPart = char.PrimaryPart
+        end
+        if not tPart then
+            tPart = char:FindFirstChild("HumanoidRootPart")
+        end
+        if not tPart then 
+            continue 
+        end
+        
+        -- Check if on screen
+        local pos, onScreen = cam:WorldToViewportPoint(tPart.Position)
+        if not onScreen then 
+            continue 
+        end
+        
+        -- Check visibility with fallback to other parts
+        local visible, hitPart = isVisible(tPart)
+        local finalPart = tPart
+        
+        if not visible then
+            -- Try with PrimaryPart or HumanoidRootPart as fallback
+            local fallbackPart = char.PrimaryPart or char:FindFirstChild("HumanoidRootPart")
+            if fallbackPart and fallbackPart ~= tPart then
+                visible, hitPart = isVisible(fallbackPart)
+                if visible then
+                    finalPart = hitPart or fallbackPart
+                end
+            end
+        else
+            finalPart = hitPart or tPart
+        end
+        
+        if not visible then 
+            continue 
+        end
+        
+        -- Calculate distance to mouse
+        local distance = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+        
+        -- Update best target
+        if distance < bestDistance then
+            bestPart = finalPart
+            bestDistance = distance
+        end
+    end
+    
+    return bestPart
+end;
+
+return getTarget
